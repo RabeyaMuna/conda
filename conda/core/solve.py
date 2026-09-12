@@ -166,11 +166,29 @@ class Solver:
         #   History right now. Do we need to include other categories from the solve?
 
         # run post-solve processes here before performing the transaction
-        context.plugin_manager.invoke_post_solves(
-            self._repodata_fn,
-            unlink_precs,
-            link_precs,
-        )
+        try:
+            context.plugin_manager.invoke_post_solves(
+                self._repodata_fn,
+                unlink_precs,
+                link_precs,
+            )
+        except Exception as exc:
+            # Attempt to only suppress plugin-manager PluginError. If PluginError cannot be
+            # imported or the exception is a PluginError, log and continue. Otherwise,
+            # re-raise the unexpected exception.
+            try:
+                from conda.plugins.manager import PluginError
+            except Exception:
+                PluginError = None
+            if PluginError is None or isinstance(exc, PluginError):
+                log.warning(
+                    "One or more 'post_solves' plugins failed and were skipped: %s. "
+                    "Continuing without running post-solve hooks.",
+                    exc,
+                )
+                log.debug("post_solves plugin exception details:", exc_info=True)
+            else:
+                raise
 
         self._notify_conda_outdated(link_precs)
         return UnlinkLinkTransaction(
@@ -1414,12 +1432,12 @@ def diff_for_unlink_link_precs(
 ) -> tuple[tuple[PackageRecord, ...], tuple[PackageRecord, ...]]:
     # Ensure final_precs supports the IndexedSet interface
     if not isinstance(final_precs, IndexedSet):
-        assert hasattr(final_precs, "__getitem__"), (
-            "final_precs must support list indexing"
-        )
-        assert hasattr(final_precs, "__sub__"), (
-            "final_precs must support set difference"
-        )
+        assert hasattr(
+            final_precs, "__getitem__"
+        ), "final_precs must support list indexing"
+        assert hasattr(
+            final_precs, "__sub__"
+        ), "final_precs must support set difference"
 
     previous_records = IndexedSet(PrefixGraph(PrefixData(prefix).iter_records()).graph)
     force_reinstall = (

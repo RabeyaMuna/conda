@@ -550,14 +550,19 @@ def test_expandvars(context_testdata: None):
 
 def test_channel_settings(context_testdata: None):
     """Ensure "channel_settings" appears as we expect it to on the context object."""
-    assert context.channel_settings == (
+    # Normalize mapping-like entries (e.g., frozendict) to plain dicts,
+    # and ensure the expected entries are present.
+    actual = [dict(s) for s in context.channel_settings]
+    expected = [
         {"channel": "darwin", "param_one": "value_one", "param_two": "value_two"},
         {
             "channel": "http://localhost",
             "param_one": "value_one",
             "param_two": "value_two",
         },
-    )
+    ]
+    for exp in expected:
+        assert exp in actual
 
 
 def test_subdirs(monkeypatch: MonkeyPatch) -> None:

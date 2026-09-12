@@ -322,4 +322,8 @@ class _SignatureVerification:
 
 
 # singleton for caching
-signature_verification = _SignatureVerification()
+def get_signature_verification():
+    """Factory: create and return a new _SignatureVerification instance.
+    Avoid creating a module-level plugin instance at import time.
+    """
+    return _SignatureVerification()

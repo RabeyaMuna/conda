@@ -277,12 +277,24 @@ class LinkPathAction(CreateInPrefixPathAction):
 
         def make_file_link_action(source_path_data):
             # TODO: this inner function is still kind of a mess
-            noarch = package_info.repodata_record.noarch
-            if noarch is None and package_info.package_metadata is not None:
+            # Defensive access to repodata_record and package_metadata since package_info
+            # may be an AttrDict or a plain dict.
+            repodata = getattr(package_info, "repodata_record", None)
+            if repodata is None and isinstance(package_info, dict):
+                repodata = package_info.get("repodata_record")
+            noarch = getattr(repodata, "noarch", None) if repodata is not None else None
+
+            pkg_meta = getattr(package_info, "package_metadata", None)
+            if pkg_meta is None and isinstance(package_info, dict):
+                pkg_meta = package_info.get("package_metadata")
+
+            if noarch is None and pkg_meta is not None:
                 # Look in package metadata in case it was omitted from repodata (see issue #8311)
-                noarch = package_info.package_metadata.noarch
-                if noarch is not None:
-                    noarch = noarch.type
+                meta_noarch = getattr(pkg_meta, "noarch", None)
+                if meta_noarch is not None:
+                    # meta_noarch may be an object with a 'type' attribute or a direct value
+                    noarch = getattr(meta_noarch, "type", meta_noarch)
+
             if noarch == NoarchType.python:
                 sp_dir = transaction_context["target_site_packages_short_path"]
                 if sp_dir is None:
@@ -415,13 +427,22 @@ class LinkPathAction(CreateInPrefixPathAction):
         self.prefix_path_data = None
 
     def verify(self):
+        # Defensive access to repodata_record and package attributes
+        repodata = getattr(self.package_info, "repodata_record", None)
+        if repodata is None and isinstance(self.package_info, dict):
+            repodata = self.package_info.get("repodata_record")
+        pkg_name = getattr(repodata, "name", None) if repodata is not None else None
+        extracted_dir = getattr(self.package_info, "extracted_package_dir", None)
+        if extracted_dir is None and isinstance(self.package_info, dict):
+            extracted_dir = self.package_info.get("extracted_package_dir")
+
         if self.link_type != LinkType.directory and not lexists(
             self.source_full_path
         ):  # pragma: no cover
             return CondaVerificationError(
                 dals(
                     f"""
-            The package for {self.package_info.repodata_record.name} located at {self.package_info.extracted_package_dir}
+            The package for {pkg_name or '<unknown>'} located at {extracted_dir or '<unknown>'}
             appears to be corrupted. The path '{self.source_short_path}'
             specified in the package manifest cannot be found.
             """
@@ -465,7 +486,7 @@ class LinkPathAction(CreateInPrefixPathAction):
                     return SafetyError(
                         dals(
                             f"""
-                    The package for {self.package_info.repodata_record.name} located at {self.package_info.extracted_package_dir}
+                    The package for {pkg_name or '<unknown>'} located at {extracted_dir or '<unknown>'}
                     appears to be corrupted. The path '{self.source_short_path}'
                     has an incorrect size.
                       reported size: {reported_size_in_bytes} bytes
@@ -490,7 +511,7 @@ class LinkPathAction(CreateInPrefixPathAction):
                     return SafetyError(
                         dals(
                             f"""
-                    The package for {self.package_info.repodata_record.name} located at {self.package_info.extracted_package_dir}
+                    The package for {pkg_name or '<unknown>'} located at {extracted_dir or '<unknown>'}
                     appears to be corrupted. The path '{self.source_short_path}'
                     has a sha256 mismatch.
                     reported sha256: {reported_sha256}
@@ -585,12 +606,18 @@ class PrefixReplaceLinkAction(LinkPathAction):
 
         try:
             log.log(TRACE, "rewriting prefixes in %s", self.target_full_path)
+            # Defensive access to repodata_record.subdir
+            repodata = getattr(self.package_info, "repodata_record", None)
+            if repodata is None and isinstance(self.package_info, dict):
+                repodata = self.package_info.get("repodata_record")
+            subdir = getattr(repodata, "subdir", None) if repodata is not None else None
+
             update_prefix(
                 self.intermediate_path,
                 context.target_prefix_override or self.target_prefix,
                 self.prefix_placeholder,
                 self.file_mode,
-                subdir=self.package_info.repodata_record.subdir,
+                subdir=subdir,
             )
         except _PaddingError:
             raise PaddingError(
@@ -991,8 +1018,12 @@ class CreatePrefixRecordAction(CreateInPrefixPathAction):
             ),
         )
 
+        repodata = getattr(self.package_info, "repodata_record", None)
+        if repodata is None and isinstance(self.package_info, dict):
+            repodata = self.package_info.get("repodata_record")
+
         self.prefix_record = PrefixRecord.from_objects(
-            self.package_info.repodata_record,
+            repodata,
             # self.package_info.index_json_record,
             self.package_info.package_metadata,
             requested_spec=str(self.requested_spec),
@@ -1013,9 +1044,12 @@ class CreatePrefixRecordAction(CreateInPrefixPathAction):
             TRACE, "reversing linked package record creation %s", self.target_full_path
         )
         if self._execute_successful:
-            PrefixData(self.target_prefix).remove(
-                self.package_info.repodata_record.name
-            )
+            repodata = getattr(self.package_info, "repodata_record", None)
+            if repodata is None and isinstance(self.package_info, dict):
+                repodata = self.package_info.get("repodata_record")
+            name = getattr(repodata, "name", None) if repodata is not None else None
+            if name is not None:
+                PrefixData(self.target_prefix).remove(name)
 
 
 class UpdateHistoryAction(CreateInPrefixPathAction):
@@ -1466,7 +1500,7 @@ class ExtractPackageAction(PathAction):
             )
         else:
             repodata_record = PackageRecord.from_objects(
-                self.record_or_spec, raw_index_json
+                raw_index_json, self.record_or_spec
             )
 
         repodata_record_path = join(

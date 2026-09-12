@@ -437,7 +437,8 @@ class TmpChannelFixture:
                 fname = package_record["fn"]
                 if fname in seen:
                     seen[fname].add(spec)
-                seen[fname] = {spec}
+                else:
+                    seen[fname] = {spec}
 
                 # copy package to channel
                 copyfile(pkgs_dir / fname, subdir / fname)
@@ -486,7 +487,7 @@ def context_aware_monkeypatch(monkeypatch: MonkeyPatch) -> MonkeyPatch:
         log.debug(f"monkeypatch cleanup: undo & reset context: {', '.join(conda_vars)}")
         monkeypatch.undo()
         # reload context without search paths
-        reset_context([])
+        reset_context()
 
 
 @pytest.fixture

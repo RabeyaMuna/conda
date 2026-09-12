@@ -583,8 +583,14 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
             )
         unlink_link_transaction.execute()
 
-    except SystemExit as e:
-        raise CondaSystemExit("Exiting", e)
+    except (SystemExit, CondaMultiError) as e:
+        # Ensure CondaMultiError raised during transaction verification/execute
+        # is converted to a CondaSystemExit so it doesn't escape tests as an
+        # unhandled multi-error. Preserve the original SystemExit message.
+        if isinstance(e, SystemExit):
+            raise CondaSystemExit("Exiting", e)
+        else:
+            raise CondaSystemExit("Transaction verification failed", e)
 
     if newenv:
         if context.subdir != context._native_subdir():

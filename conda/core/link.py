@@ -337,6 +337,9 @@ class UnlinkLinkTransaction:
             if exceptions:
                 try:
                     maybe_raise(CondaMultiError(exceptions), context)
+                    # Ensure the CondaMultiError is propagated even if maybe_raise
+                    # chooses not to raise in some contexts
+                    raise CondaMultiError(exceptions)
                 except:
                     rm_rf(self.transaction_context["temp_dir"])
                     raise
@@ -1112,7 +1115,7 @@ class UnlinkLinkTransaction:
                 reverse_excs = ()
                 if context.rollback_enabled:
                     reverse_excs = UnlinkLinkTransaction._reverse_actions(axngroup)
-                return CondaMultiError(
+                raise CondaMultiError(
                     (
                         e,
                         axngroup,
@@ -1176,14 +1179,16 @@ class UnlinkLinkTransaction:
             (
                 package_info
                 for package_info in packages_info_to_link
-                if package_info.repodata_record.name == "python"
+                if getattr(getattr(package_info, "repodata_record", None), "name", None)
+                == "python"
             ),
             None,
         )
         if linking_new_python:
-            python_record = linking_new_python.repodata_record
-            log.debug(f"found in current transaction python: {python_record}")
-            return version_and_sp(python_record)
+            python_record = getattr(linking_new_python, "repodata_record", None)
+            if python_record is not None:
+                log.debug(f"found in current transaction python: {python_record}")
+                return version_and_sp(python_record)
         python_record = PrefixData(target_prefix).get("python", None)
         if python_record:
             unlinking_python = next(

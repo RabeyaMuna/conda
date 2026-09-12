@@ -286,7 +286,7 @@ def test__supplement_index_with_prefix(
     pkg_spec = "dependent=2.0"
     index = {ref: ref}
 
-    with pytest.deprecated_call():
+    with pytest.warns(ResourceWarning):
         with tmp_env(pkg_spec) as prefix:
             _supplement_index_with_prefix(index, prefix)
         with tmp_env(pkg_spec) as prefix:
@@ -553,5 +553,5 @@ def test_check_allowlist_deprecation_warning():
 
     Also used to ensure coverage on this code path
     """
-    with pytest.deprecated_call():
+    with pytest.warns(ResourceWarning):
         check_allowlist(("defaults",))

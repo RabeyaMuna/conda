@@ -284,11 +284,39 @@ class CondaPluginManager(pluggy.PluginManager):
             )
         plugins = sorted(plugins, key=lambda plugin: plugin.name)
 
-        # Check for conflicts
-        seen = set()
-        conflicts = [
-            plugin for plugin in plugins if plugin.name in seen or seen.add(plugin.name)
-        ]
+        # Deduplicate identical plugin registrations by canonical identity so
+        # repeated registrations of the exact same plugin implementation are
+        # not treated as conflicts.
+        unique_plugins = []
+        seen_idents = set()
+        for plugin in plugins:
+            try:
+                ident = self.get_canonical_name(plugin)
+            except Exception:
+                ident = f"{plugin.__class__.__module__}.{plugin.__class__.__name__}"
+            if ident not in seen_idents:
+                seen_idents.add(ident)
+                unique_plugins.append(plugin)
+        plugins = unique_plugins
+
+        # Check for conflicts: distinct plugin implementations that expose the
+        # same plugin.name are considered conflicts.
+        name_to_idents = {}
+        name_to_plugins = {}
+        for plugin in plugins:
+            name_val = plugin.name
+            try:
+                ident = self.get_canonical_name(plugin)
+            except Exception:
+                ident = f"{plugin.__class__.__module__}.{plugin.__class__.__name__}"
+            name_to_idents.setdefault(name_val, set()).add(ident)
+            name_to_plugins.setdefault(name_val, []).append(plugin)
+
+        conflicts = []
+        for nm, idents in name_to_idents.items():
+            if len(idents) > 1:
+                conflicts.extend(name_to_plugins.get(nm, []))
+
         if conflicts:
             raise PluginError(
                 dals(

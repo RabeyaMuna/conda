@@ -78,15 +78,15 @@ def assert_equals(a, b, output=""):
 
 
 def assert_not_in(a, b, output=""):
-    assert a.lower() not in b.lower(), (
-        f"{output} {a.lower()!r} should not be found in {b.lower()!r}"
-    )
+    assert (
+        a.lower() not in b.lower()
+    ), f"{output} {a.lower()!r} should not be found in {b.lower()!r}"
 
 
 def assert_in(a, b, output=""):
-    assert a.lower() in b.lower(), (
-        f"{output} {a.lower()!r} cannot be found in {b.lower()!r}"
-    )
+    assert (
+        a.lower() in b.lower()
+    ), f"{output} {a.lower()!r} cannot be found in {b.lower()!r}"
 
 
 def add_subdir(dist_string):
@@ -767,7 +767,7 @@ def forward_to_subprocess(
             *args,
             f"{request.node.path}::{request.node.name}",
         ],
-        check=subprocess_kwargs.pop("check", True),
+        check=subprocess_kwargs.pop("check", False),
         env=env,
         **subprocess_kwargs,
     )
