@@ -284,13 +284,18 @@ class CondaPluginManager(pluggy.PluginManager):
             )
         plugins = sorted(plugins, key=lambda plugin: plugin.name)
 
-        # Check for conflicts
+        # Check for conflicts and keep the first plugin registered for each name.
         seen = set()
-        conflicts = [
-            plugin for plugin in plugins if plugin.name in seen or seen.add(plugin.name)
-        ]
+        deduped_plugins = []
+        conflicts = []
+        for plugin in plugins:
+            if plugin.name in seen:
+                conflicts.append(plugin)
+                continue
+            seen.add(plugin.name)
+            deduped_plugins.append(plugin)
         if conflicts:
-            raise PluginError(
+            log.warning(
                 dals(
                     f"""
                     Conflicting `{name}` plugins found:
@@ -299,10 +304,11 @@ class CondaPluginManager(pluggy.PluginManager):
 
                     Multiple conda plugins are registered via the `{specname}` hook.
                     Please make sure that you don't have any incompatible plugins installed.
+                    Using the first registered plugin for each name.
                     """
                 )
             )
-        return plugins
+        return deduped_plugins
 
     def get_solvers(self) -> dict[str, CondaSolver]:
         """Return a mapping from solver name to solver class."""
