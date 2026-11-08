@@ -1,0 +1,22 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Pin `charset-normalizer` to `>=3.4.8` to avoid the eager, cascading
+  multi-byte codec imports at module import time that were removed in that
+  release, which could crash on interpreters with an incomplete/broken
+  multi-byte codec implementation. (#551)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>

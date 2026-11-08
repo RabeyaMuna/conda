@@ -1,11 +1,17 @@
-anaconda-client
+anaconda-client >=1.13,<1.13.1
+conda >=25.5,<25.6  # keep installed entry points compatible with this branch
+conda-content-trust >=0.2,<0.3  # 0.3 duplicates the post-solve hook
+conda-libmamba-solver >=25.4,<25.5  # keep solver API compatible with conda 25.5
 coverage
+cpython  # prevent defaults-first solves from selecting GraalPy
+cryptography <46  # keep root verification compatible with conda-content-trust 0.2
 flask >=2.2  # jlap pytest fixture
 git
 importlib_resources >= 5.10  # only necessary for Python < 3.12
+menuinst >=2,<2.5  # 2.5 changed the generated Windows shortcut layout
 pexpect
-pip
-pytest
+pip <26
+pytest <9
 pytest-cov
 pytest-mock
 pytest-rerunfailures

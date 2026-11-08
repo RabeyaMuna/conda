@@ -1,12 +1,9 @@
 # Copyright (C) 2012 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
-import re
-
 import pytest
 from requests.auth import HTTPBasicAuth
 
 from conda import plugins
-from conda.exceptions import PluginError
 
 PLUGIN_NAME = "custom_auth"
 PLUGIN_NAME_ALT = "custom_auth_alt"
@@ -70,12 +67,9 @@ def test_get_auth_handler_multiple(plugin_manager):
 
 def test_duplicated(plugin_manager):
     """
-    Make sure that a PluginError is raised if we register the same auth backend twice.
+    Make sure that duplicate registrations of the same auth backend are ignored.
     """
     plugin_manager.register(CustomAuthPlugin())
     plugin_manager.register(CustomAuthPlugin())
 
-    with pytest.raises(
-        PluginError, match=re.escape("Conflicting `auth_handlers` plugins found")
-    ):
-        plugin_manager.get_auth_handler(PLUGIN_NAME)
+    assert plugin_manager.get_auth_handler(PLUGIN_NAME) is CustomCondaAuth

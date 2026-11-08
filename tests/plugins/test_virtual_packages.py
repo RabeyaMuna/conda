@@ -47,6 +47,12 @@ class VirtualPackagesPlugin:
         )
 
 
+class ConflictingVirtualPackagesPlugin:
+    @plugins.hookimpl
+    def conda_virtual_packages(self):
+        yield CondaVirtualPackage(name="abc", version="different", build=None)
+
+
 @pytest.fixture()
 def plugin(plugin_manager):
     plugin = VirtualPackagesPlugin()
@@ -75,16 +81,17 @@ def test_duplicated(plugin_manager):
     plugin_manager.register(VirtualPackagesPlugin())
     plugin_manager.register(VirtualPackagesPlugin())
 
+    assert len(plugin_manager.get_hook_results("virtual_packages")) == 3
+
+
+def test_conflicting_virtual_packages(plugin_manager):
+    plugin_manager.register(VirtualPackagesPlugin())
+    plugin_manager.register(ConflictingVirtualPackagesPlugin())
+
     with pytest.raises(
         PluginError, match=re.escape("Conflicting `virtual_packages` plugins found")
     ):
-        conda.core.index.ReducedIndex(
-            prefix=context.default_prefix,
-            channels=context.default_channels,
-            subdirs=context.subdirs,
-            specs=(),
-            repodata_fn=context.repodata_fns[0],
-        )
+        plugin_manager.get_hook_results("virtual_packages")
 
 
 def test_cuda_detection(clear_cuda_version):

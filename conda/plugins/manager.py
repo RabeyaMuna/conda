@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+from dataclasses import fields, is_dataclass
 from importlib.metadata import distributions
 from inspect import getmodule, isclass
 from typing import TYPE_CHECKING, overload
@@ -71,6 +72,33 @@ if TYPE_CHECKING:
     )
 
 log = logging.getLogger(__name__)
+
+
+def _plugin_signature(plugin: object) -> tuple:
+    """
+    Build an identity-independent signature for a plugin's fields.
+
+    Two separate instances of the same built-in plugin class (e.g. because more than
+    one installation of conda is importable in the environment) describe the same
+    plugin even though they are different objects; comparing their type instead of
+    their identity lets us tell that apart from an actual conflicting plugin.
+    """
+    if is_dataclass(plugin):
+        items = ((field.name, getattr(plugin, field.name)) for field in fields(plugin))
+    elif hasattr(plugin, "_asdict"):
+        items = plugin._asdict().items()
+    else:
+        items = ()
+
+    signature = []
+    for field_name, value in items:
+        if isclass(value):
+            signature.append((field_name, value.__module__, value.__qualname__))
+        elif callable(value) or hasattr(value, "__dict__"):
+            signature.append((field_name, type(value).__module__, type(value).__qualname__))
+        else:
+            signature.append((field_name, value))
+    return tuple(signature)
 
 
 class CondaPluginManager(pluggy.PluginManager):
@@ -284,11 +312,20 @@ class CondaPluginManager(pluggy.PluginManager):
             )
         plugins = sorted(plugins, key=lambda plugin: plugin.name)
 
-        # Check for conflicts
-        seen = set()
-        conflicts = [
-            plugin for plugin in plugins if plugin.name in seen or seen.add(plugin.name)
-        ]
+        # Check for conflicts, but tolerate harmless duplicate registrations of the
+        # exact same plugin (e.g. when more than one installation of conda is
+        # importable in the environment and the same built-in plugin ends up
+        # registered more than once)
+        seen: dict[str, tuple] = {}
+        deduped = []
+        conflicts = []
+        for plugin in plugins:
+            signature = _plugin_signature(plugin)
+            if plugin.name not in seen:
+                seen[plugin.name] = signature
+                deduped.append(plugin)
+            elif seen[plugin.name] != signature:
+                conflicts.append(plugin)
         if conflicts:
             raise PluginError(
                 dals(
@@ -302,7 +339,7 @@ class CondaPluginManager(pluggy.PluginManager):
                     """
                 )
             )
-        return plugins
+        return deduped
 
     def get_solvers(self) -> dict[str, CondaSolver]:
         """Return a mapping from solver name to solver class."""

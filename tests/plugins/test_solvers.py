@@ -49,6 +49,15 @@ class VerboseSolverPlugin:
         )
 
 
+class ConflictingSolverPlugin:
+    @plugins.hookimpl
+    def conda_solvers(self):
+        yield plugins.CondaSolver(
+            name="classic",
+            backend=VerboseSolver,
+        )
+
+
 def test_get_solver_backend(plugin_manager, solver_classic):
     plugin = SolverPlugin()
     plugin_manager.register(plugin)
@@ -108,10 +117,7 @@ def test_duplicated(plugin_manager):
     plugin_manager.register(SolverPlugin())
     plugin_manager.register(SolverPlugin())
 
-    with pytest.raises(
-        PluginError, match=re.escape("Conflicting `solvers` plugins found")
-    ):
-        plugin_manager.get_solver_backend()
+    assert plugin_manager.get_hook_results("solvers") == [classic_solver]
 
 
 def test_get_no_solver(plugin_manager):
@@ -141,7 +147,7 @@ def test_get_two_solvers(plugin_manager):
 
 def test_get_conflicting_solvers(plugin_manager):
     plugin_manager.register(SolverPlugin())
-    plugin_manager.register(SolverPlugin())
+    plugin_manager.register(ConflictingSolverPlugin())
 
     with pytest.raises(
         PluginError, match=re.escape("Conflicting `solvers` plugins found")

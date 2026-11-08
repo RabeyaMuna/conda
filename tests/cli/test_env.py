@@ -661,10 +661,16 @@ def test_export_multi_channel(
             "test_timestamp_sort",
             "--yes",
         )
-        stdout, _, _ = conda_cli("env", "export", f"--prefix={prefix}")
+        # Avoid pinning build strings from live channels.  A build can disappear
+        # from repodata between exporting and recreating the environment even
+        # when the package version remains available.
+        stdout, _, _ = conda_cli("env", "export", f"--prefix={prefix}", "--no-builds")
         assert "conda-test" in stdout
 
-        stdout1, _, _ = conda_cli("list", f"--prefix={prefix}", "--explicit")
+        packages1 = {
+            (record.name, record.version)
+            for record in PrefixData(prefix).iter_records()
+        }
 
         env_yml = path_factory(suffix=".yml")
         env_yml.write_text(stdout)
@@ -674,9 +680,12 @@ def test_export_multi_channel(
         conda_cli("env", "create", f"--prefix={prefix}", f"--file={env_yml}", "--yes")
         assert PrefixData(prefix).is_environment()
 
-        # check explicit that we have same file
-        stdout2, _, _ = conda_cli("list", f"--prefix={prefix}", "--explicit")
-        assert stdout1 == stdout2
+        # The no-build export must still recreate the same package versions.
+        packages2 = {
+            (record.name, record.version)
+            for record in PrefixData(prefix).reload().iter_records()
+        }
+        assert packages1 == packages2
 
 
 @pytest.mark.integration

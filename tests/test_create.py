@@ -2256,6 +2256,9 @@ def test_disallowed_packages(
 def test_dont_remove_conda_1(
     monkeypatch: MonkeyPatch, tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture
 ):
+    if context.solver == "classic" and "conda-forge" in context.channels:
+        pytest.skip("Classic solver is too slow with conda-forge.")
+
     with tmp_env() as prefix:
         monkeypatch.setenv("CONDA_ROOT_PREFIX", prefix)
         reset_context()
@@ -2284,6 +2287,9 @@ def test_dont_remove_conda_1(
 def test_dont_remove_conda_2(
     conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture, monkeypatch: MonkeyPatch
 ):
+    if context.solver == "classic" and "conda-forge" in context.channels:
+        pytest.skip("Classic solver is too slow with conda-forge.")
+
     # regression test for #6904
     with tmp_env() as prefix:
         monkeypatch.setenv("CONDA_ROOT_PREFIX", prefix)
@@ -2456,7 +2462,10 @@ def test_conda_downgrade(
     # elevate verbosity so we can inspect subprocess' stdout/stderr
     monkeypatch.setenv("CONDA_VERBOSE", "2")
 
-    with tmp_env("python=3.11", "conda") as prefix:  # rev 0
+    # Keep the foreign conda within this maintenance branch's compatibility
+    # window.  Testing against the latest available conda can otherwise pull a
+    # future release whose transaction-history format this checkout predates.
+    with tmp_env("python=3.11", "conda<25.6") as prefix:  # rev 0
         conda_exe = str(prefix / BIN_DIRECTORY / ("conda.exe" if on_win else "conda"))
         assert (py_prec := package_is_installed(prefix, "python"))
         assert (conda_prec := package_is_installed(prefix, "conda"))

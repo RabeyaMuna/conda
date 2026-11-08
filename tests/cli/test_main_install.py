@@ -132,7 +132,17 @@ def test_build_version_shows_as_changed(
         return
 
     with tmp_env("python=3.11", "numpy") as prefix:
-        out, err, _ = conda_cli("install", f"--prefix={prefix}", "python=3.12", "--yes")
+        # Keep NumPy at the same version so changing Python necessarily changes
+        # only NumPy's build.  If the unconstrained NumPy version also changes,
+        # conda correctly classifies it as UPDATED instead of REVISED.
+        numpy_version = PrefixData(prefix).get("numpy").version
+        out, err, _ = conda_cli(
+            "install",
+            f"--prefix={prefix}",
+            "python=3.12",
+            f"numpy={numpy_version}",
+            "--yes",
+        )
         assert "The following packages will be UPDATED" in out
         assert "The following packages will be REVISED" in out
         assert "The following packages will be DOWNGRADED" not in out

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import re
-import sys
 from inspect import isclass, isfunction
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -138,10 +137,11 @@ def test_sorted_commands_in_error(capsys):
     except SystemExit:
         stderr = capsys.readouterr().err
         # ...but the suggestions here are sorted
-        if sys.version_info < (3, 12):
-            # FUTURE: Python 3.12+: remove this test case
-            assert "invalid choice: 'd' (choose from 'a', 'b', 'c')" in stderr
-        else:
-            assert "invalid choice: 'd' (choose from a, b, c)" in stderr
+        # CPython patch releases vary in whether choices are quoted. Both
+        # renderings still prove that the commands were sorted.
+        assert (
+            "invalid choice: 'd' (choose from 'a', 'b', 'c')" in stderr
+            or "invalid choice: 'd' (choose from a, b, c)" in stderr
+        )
     else:
         pytest.fail("Did not raise")
